@@ -7,7 +7,7 @@ from fpdf import FPDF
 import pytz
 
 # --- ZONA HORARIA Y CONFIGURACIÓN ---
-st.set_page_config(page_title="Sabana Queuing", layout="wide", page_icon="🦅")
+st.set_page_config(page_title="Sabana Queuing Pro", layout="wide", page_icon="🦅")
 BOGOTA_TZ = pytz.timezone('America/Bogota')
 
 # --- DISEÑO ESTÉTICO ---
@@ -19,9 +19,7 @@ st.markdown("""
     }
     .pill-orange { background-color: #fef3c7; color: #b45309; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
     .pill-blue { background-color: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
-    /* Estilo del botón de borrar en la tabla */
     .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; padding: 2px 10px !important; }
-    .del-btn button:hover { background-color: #fecaca !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -33,7 +31,12 @@ if 'counter' not in st.session_state: st.session_state.counter = 1
 if 'max_q' not in st.session_state: st.session_state.max_q = 0
 
 # --- FUNCIONES ---
-def format_time(seconds):
+def format_time_exact(seconds):
+    if pd.isna(seconds) or seconds is None or seconds <= 0: return "0m 0.00s"
+    m, s = divmod(seconds, 60)
+    return f"{int(m)}m {s:.2f}s"
+
+def format_time_simple(seconds):
     if pd.isna(seconds) or seconds is None or seconds < 0: return "-"
     m, s = divmod(int(seconds), 60)
     return f"{m}m {s}s"
@@ -43,266 +46,165 @@ def export_excel(cust_data):
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
     if cust_data:
         df = pd.DataFrame(cust_data)
-        
-        # Formatear tiempos para el Excel
-        df['Waiting Time'] = df['Wait_Sec'].apply(format_time)
-        df['Service Time'] = df['Service_Sec'].apply(format_time)
-        df['Total Time in System'] = df['Total_Sec'].apply(format_time)
-        
-        # Filtrar columnas a exportar (sin Notes)
-        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Waiting Time', 'Service Time', 'Total Time in System']
-        df_export = df[cols].copy()
-        
-        df_export.to_excel(writer, index=False, sheet_name='Observation_Data')
-        workbook = writer.book
-        worksheet = writer.sheets['Observation_Data']
-        header_format = workbook.add_format({'bold': True, 'fg_color': '#e2e8f0', 'font_color': '#0f172a', 'border': 1})
-        for col_num, value in enumerate(cols):
-            worksheet.write(0, col_num, value, header_format)
-            worksheet.set_column(col_num, col_num, 18)
+        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status']
+        df[cols].to_excel(writer, index=False)
     writer.close()
     return output.getvalue()
 
 def export_pdf(session_info, cust_data):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=16, style='B')
-    pdf.cell(200, 10, txt="Observation Summary Report", ln=1, align='C')
-    
+    pdf.set_fill_color(30, 41, 59)
+    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Arial", size=20, style='B')
+    pdf.cell(0, 15, txt="SABANA QUEUING REPORT", ln=1, align='C')
     pdf.set_font("Arial", size=10)
-    pdf.cell(200, 8, txt=f"Date: {session_info['date']}", ln=1)
-    pdf.cell(200, 8, txt=f"Observer: {session_info['observer']}", ln=1)
-    pdf.cell(200, 8, txt=f"Total Customers Recorded: {len(cust_data)}", ln=1)
-    
-    pdf.ln(5)
-    pdf.set_font("Arial", size=9, style='B')
-    pdf.cell(25, 10, 'ID', 1)
-    pdf.cell(35, 10, 'Arrival Time', 1)
-    pdf.cell(35, 10, 'Status', 1)
-    pdf.cell(35, 10, 'Total Time', 1)
-    pdf.ln(10)
-    
-    pdf.set_font("Arial", size=9)
+    pdf.cell(0, 5, txt=f"Professional Operations Analysis | Observer: {session_info['observer']}", ln=1, align='C')
+    pdf.ln(20); pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", size=11, style='B')
+    pdf.cell(0, 10, txt=f"Date: {session_info['date']}", ln=1)
     for c in cust_data:
-        pdf.cell(25, 10, str(c['Customer ID']), 1)
-        pdf.cell(35, 10, str(c['Arrival Time']), 1)
-        pdf.cell(35, 10, str(c['Status'].replace('✅ ', '')), 1)
-        tot = format_time(c['Total_Sec']) if c['Total_Sec'] else "-"
-        pdf.cell(35, 10, str(tot), 1)
-        pdf.ln(10)
-        
+        pdf.cell(0, 8, txt=f"{c['Customer ID']} | Arrival: {c['Arrival Time']} | Status: {c['Status']}", ln=1, border='B')
     return pdf.output(dest='S').encode('latin-1')
 
+def render_full_dashboard(cust_data, session_info, max_q):
+    df = pd.DataFrame(cust_data)
+    if df.empty: return st.info("No data recorded yet.")
+    
+    comp = df[df['Status'] == 'Completed']
+    avg_w = comp['Wait_Sec'].mean() if not comp.empty else 0
+    avg_s = comp['Service_Sec'].mean() if not comp.empty else 0
+    
+    st.subheader("📊 Performance Metrics")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Arrivals", len(df))
+    m2.metric("Max Queue 👤", max_q)
+    m3.metric("Avg Wait (Exact)", format_time_exact(avg_w))
+    m4.metric("Avg Service (Exact)", format_time_exact(avg_s))
+
+    st.write("---")
+    st.subheader("📐 Queueing Theory (λ, μ, ρ)")
+    
+    # Tiempo transcurrido
+    if 'end_time' in session_info:
+        duration_hrs = (session_info['end_time'] - session_info['start_time']).total_seconds() / 3600
+    else:
+        duration_hrs = (datetime.now(BOGOTA_TZ) - session_info['start_time']).total_seconds() / 3600
+    
+    duration_hrs = max(duration_hrs, 0.001) 
+    lam = len(df) / duration_hrs
+    miu = (3600 / avg_s) if avg_s > 0 else 0
+    rho = (lam / miu) if miu > 0 else 0
+    no_util = max(0, 1 - rho) # Complemento exacto de rho
+
+    c_l, c_m, c_r, c_n = st.columns(4)
+    c_l.metric("Arrival Rate (λ)", f"{lam:.2f} c/hr")
+    c_m.metric("Service Rate (μ)", f"{miu:.2f} c/hr")
+    
+    if rho > 1:
+        c_r.metric("Utilization (ρ)", f"{rho:.1%}", delta="UNSTABLE", delta_color="inverse")
+        c_n.metric("No Utilización", "0.0%", help="Sistema saturado")
+    else:
+        c_r.metric("Utilization (ρ)", f"{rho:.1%}", delta="STABLE")
+        c_n.metric("No Utilización", f"{no_util:.1%}", help="Capacidad ociosa (1 - rho)")
+
+    st.write("---")
+    g1, g2 = st.columns(2)
+    with g1:
+        st.write("**📊 Arrival Frequency (Poisson)**")
+        df['Min'] = pd.to_datetime(df['Arrival_ts'], unit='s').dt.tz_localize('UTC').dt.tz_convert(BOGOTA_TZ).dt.strftime('%H:%M')
+        st.bar_chart(df.groupby('Min').size(), color="#2563eb")
+    with g2:
+        st.write("**📊 Service Times (Exponential)**")
+        if not comp.empty: st.area_chart(comp['Service_Sec'], color="#10b981")
+
 # ==========================================
-# PANTALLA 1: SETUP (INICIO DE SESIÓN)
+# INTERFAZ
 # ==========================================
 if st.session_state.active_session is None:
     st.title("🦅 Sabana Queuing System")
-    st.write("Academic operations tracker. Fill the details below to start.")
     st.write("---")
-    
-    c1, c2 = st.columns([1, 1], gap="large")
-    with c1:
-        st.subheader("Start New Session")
+    c_new, c_hist = st.columns([1, 1.2], gap="large")
+    with c_new:
+        st.subheader("Start Measurement")
         with st.container(border=True):
-            obs_name = st.text_input("Observer Name")
-            
-            if st.button("▶ START RECORDING", type="primary", use_container_width=True):
-                if obs_name:
+            name = st.text_input("Observer Name")
+            if st.button("▶ START MEASURING", type="primary", use_container_width=True):
+                if name:
                     st.session_state.active_session = {
-                        "date": datetime.now(BOGOTA_TZ).strftime("%Y-%m-%d"),
-                        "observer": obs_name,
-                        "system_start_ts": time.time()
+                        "observer": name, "date": datetime.now(BOGOTA_TZ).strftime("%Y-%m-%d"),
+                        "start_time": datetime.now(BOGOTA_TZ), "system_start_ts": time.time()
                     }
-                    st.session_state.customers = []
-                    st.session_state.counter = 1
-                    st.session_state.max_q = 0
+                    st.session_state.customers, st.session_state.counter, st.session_state.max_q = [], 1, 0
                     st.rerun()
-                else:
-                    st.error("Please enter the Observer Name.")
-                    
-    with c2:
-        st.subheader("Session History")
+                else: st.error("Enter a name.")
+    with c_hist:
+        st.subheader("History")
         if st.session_state.history:
-            for s in reversed(st.session_state.history):
+            for i, s in enumerate(reversed(st.session_state.history)):
                 with st.container(border=True):
-                    st.write(f"**Date:** {s['info']['date']} | **Observer:** {s['info']['observer']}")
-                    col_ex1, col_ex2 = st.columns(2)
-                    with col_ex1:
-                        st.download_button("💾 Download Excel", export_excel(s['data']), f"Queue_{s['info']['date']}.xlsx", key=f"ex_hist_{s['info']['system_start_ts']}")
-                    with col_ex2:
-                        st.download_button("📄 Download PDF", export_pdf(s['info'], s['data']), f"Report_{s['info']['date']}.pdf", key=f"pdf_hist_{s['info']['system_start_ts']}")
-        else:
-            st.info("No completed sessions yet.")
-
-# ==========================================
-# PANTALLA 2: WORKSPACE (ÁREA DE TRABAJO)
-# ==========================================
+                    st.write(f"**{s['info']['date']}** | Obs: {s['info']['observer']}")
+                    col1, col2, col3, col4 = st.columns(4)
+                    col1.download_button("Excel", export_excel(s['data']), f"E_{i}.xlsx", key=f"ex_{i}")
+                    col2.download_button("PDF", export_pdf(s['info'], s['data']), f"P_{i}.pdf", key=f"pd_{i}")
+                    if col3.button("📊 Dash", key=f"d_{i}"): render_full_dashboard(s['data'], s['info'], s.get('max_q', 0))
+                    if col4.button("🗑️", key=f"del_{i}"):
+                        st.session_state.history = [h for h in st.session_state.history if h['info']['system_start_ts'] != s['info']['system_start_ts']]
+                        st.rerun()
 else:
+    # --- WORKSPACE ---
     h1, h2 = st.columns([4, 1])
-    h1.title("Real-Time Queue Registration")
-    
+    h1.title("🔴 Live Measurement")
     if h2.button("⏹ END SESSION", type="secondary", use_container_width=True):
-        st.session_state.history.append({"info": st.session_state.active_session, "data": list(st.session_state.customers)})
+        st.session_state.active_session["end_time"] = datetime.now(BOGOTA_TZ)
+        st.session_state.history.append({"info": st.session_state.active_session, "data": list(st.session_state.customers), "max_q": st.session_state.max_q})
         st.session_state.active_session = None
         st.rerun()
-
-    st.write("---")
-
-    col_btn, _ = st.columns([1, 3])
-    with col_btn:
-        if st.button("➕ REGISTER NEW ARRIVAL", type="primary", use_container_width=True):
-            st.session_state.customers.append({
-                "Customer ID": f"C{st.session_state.counter:03d}",
-                "Status": "Waiting",
-                "Arrival_ts": time.time(),
-                "Arrival Time": datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p"),
-                "Start_ts": None, "Service Start Time": "-", 
-                "End_ts": None, "Service End Time": "-",
-                "Wait_Sec": None, "Service_Sec": None, "Total_Sec": None
-            })
-            st.session_state.counter += 1
-            
-            # Recalcular fila máxima
-            current_q = len([c for c in st.session_state.customers if c['Status'] == 'Waiting'])
-            if current_q > st.session_state.max_q: 
-                st.session_state.max_q = current_q
-            st.rerun()
     
-    st.write("")
+    if st.button("➕ REGISTER ARRIVAL 👤", type="primary", use_container_width=True):
+        st.session_state.customers.append({
+            "Customer ID": f"C{st.session_state.counter:03d}", "Status": "Waiting", "Arrival_ts": time.time(),
+            "Arrival Time": datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p"),
+            "Start_ts": None, "End_ts": None, "Wait_Sec": 0, "Service_Sec": 0, "Total_Sec": 0
+        })
+        st.session_state.counter += 1
+        st.rerun()
 
-    wait_list = [c for c in st.session_state.customers if c['Status'] == 'Waiting']
-    serv_list = [c for c in st.session_state.customers if c['Status'] == 'In Service']
-    comp_list = [c for c in st.session_state.customers if c['Status'] == 'Completed']
-
-    col_w, col_s = st.columns(2)
-
-    with col_w:
-        with st.container(border=True):
-            cw1, cw2 = st.columns([3, 1])
-            cw1.subheader("Waiting Queue")
-            cw2.markdown(f'<div class="pill-blue" style="text-align:center;">{len(wait_list)} waiting</div>', unsafe_allow_html=True)
-            
-            if not wait_list:
-                st.write("No customers currently waiting.")
-            
-            for i, c in enumerate(wait_list):
-                with st.container(border=True):
-                    sc1, sc2 = st.columns([3, 1])
-                    sc1.markdown(f"**{c['Customer ID']}**")
-                    sc2.markdown(f'<div class="pill-orange" style="float:right;">Position {i+1}</div>', unsafe_allow_html=True)
-                    st.caption(f"Arrival: {c['Arrival Time']}")
-                    
-                    if st.button("Start Service", key=f"s_{c['Customer ID']}", type="primary"):
-                        for item in st.session_state.customers:
-                            if item['Customer ID'] == c['Customer ID']:
-                                item['Status'] = 'In Service'
-                                item['Start_ts'] = time.time()
-                                item['Service Start Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
-                        st.rerun()
-
-    with col_s:
-        with st.container(border=True):
-            cs1, cs2 = st.columns([3, 1])
-            cs1.subheader("Customers In Service")
-            cs2.markdown(f'<div class="pill-blue" style="text-align:center;">{len(serv_list)} in service</div>', unsafe_allow_html=True)
-            
-            if not serv_list:
-                st.write("No active service at the moment.")
-            
-            for c in serv_list:
-                with st.container(border=True):
-                    sc1, sc2 = st.columns([3, 1])
-                    sc1.markdown(f"**{c['Customer ID']}**")
-                    sc2.markdown('<div class="pill-blue" style="float:right;">In Service</div>', unsafe_allow_html=True)
-                    st.caption(f"Service start: {c['Service Start Time']}")
-                    
-                    if st.button("End Service", key=f"e_{c['Customer ID']}", type="primary"):
-                        for item in st.session_state.customers:
-                            if item['Customer ID'] == c['Customer ID']:
-                                item['Status'] = 'Completed'
-                                item['End_ts'] = time.time()
-                                item['Service End Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
-                                item['Wait_Sec'] = item['Start_ts'] - item['Arrival_ts']
-                                item['Service_Sec'] = item['End_ts'] - item['Start_ts']
-                                item['Total_Sec'] = item['End_ts'] - item['Arrival_ts']
-                        st.rerun()
-
-    st.markdown(f'<div class="pill-blue" style="display:inline-block; margin-top:10px;">Completed customers: {len(comp_list)}</div>', unsafe_allow_html=True)
-    st.write("---")
-
-    # --- PESTAÑAS: TABLA Y DASHBOARD ---
-    tab_table, tab_dash = st.tabs(["📝 Detailed Data Table", "📊 Live Dashboard"])
+    cw, cs = st.columns(2)
+    with cw:
+        st.subheader("Waiting ⏳")
+        for c in [x for x in st.session_state.customers if x['Status'] == 'Waiting']:
+            with st.container(border=True):
+                st.write(f"**{c['Customer ID']}** 👤")
+                if st.button(f"Start Service {c['Customer ID']}", type="primary"):
+                    c['Status'], c['Start_ts'] = 'In Service', time.time()
+                    st.rerun()
+    with cs:
+        st.subheader("In Service ⚙️")
+        for c in [x for x in st.session_state.customers if x['Status'] == 'In Service']:
+            with st.container(border=True):
+                st.write(f"**{c['Customer ID']}** 🧑‍💻")
+                if st.button(f"End Service {c['Customer ID']}", type="primary"):
+                    c['Status'], c['End_ts'] = 'Completed', time.time()
+                    c['Wait_Sec'], c['Service_Sec'] = c['Start_ts'] - c['Arrival_ts'], c['End_ts'] - c['Start_ts']
+                    st.rerun()
     
-    with tab_table:
-        if st.session_state.customers:
-            
-            # --- ENCABEZADOS DE LA TABLA PERSONALIZADA ---
-            col_heads = st.columns([1, 1.5, 1.5, 1.5, 1.5, 1.2, 1.2, 1.2, 0.8])
-            col_heads[0].markdown("**ID**")
-            col_heads[1].markdown("**Arrival**")
-            col_heads[2].markdown("**Start**")
-            col_heads[3].markdown("**End**")
-            col_heads[4].markdown("**Status**")
-            col_heads[5].markdown("**Wait**")
-            col_heads[6].markdown("**Service**")
-            col_heads[7].markdown("**Total**")
-            col_heads[8].markdown("**Action**")
-            
-            st.markdown('<hr style="margin: 0px 0px 10px 0px; border-top: 2px solid #cbd5e1;">', unsafe_allow_html=True)
-
-            # --- FILAS DE LA TABLA ---
-            for c in st.session_state.customers:
-                cols = st.columns([1, 1.5, 1.5, 1.5, 1.5, 1.2, 1.2, 1.2, 0.8])
-                cols[0].write(f"**{c['Customer ID']}**")
-                cols[1].write(c['Arrival Time'])
-                cols[2].write(c['Service Start Time'])
-                cols[3].write(c['Service End Time'])
-                
-                status_icon = "⏳ Waiting" if c['Status'] == 'Waiting' else "👩‍🍳 In Service" if c['Status'] == 'In Service' else "✅ Completed"
-                cols[4].write(status_icon)
-                
-                cols[5].write(format_time(c['Wait_Sec']))
-                cols[6].write(format_time(c['Service_Sec']))
-                cols[7].write(format_time(c['Total_Sec']))
-                
-                with cols[8]:
-                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
-                    if st.button("🗑️ Del", key=f"del_row_{c['Customer ID']}", use_container_width=True):
-                        st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
-                
-                st.markdown('<hr style="margin: 5px 0px; border-top: 1px solid #f1f5f9;">', unsafe_allow_html=True)
-
-            st.write("")
-            col_export1, col_export2 = st.columns([1, 1])
-            with col_export1:
-                st.download_button("💾 Export Data to Excel", export_excel(st.session_state.customers), f"Live_Data_{st.session_state.active_session['date']}.xlsx")
-            with col_export2:
-                st.download_button("📄 Export Data to PDF", export_pdf(st.session_state.active_session, st.session_state.customers), f"Live_Report_{st.session_state.active_session['date']}.pdf")
-                
-        else:
-            st.caption("Records will appear here once you register an arrival.")
-
-    with tab_dash:
-        st.subheader("System Analytics")
-        st.write("Calculations are based strictly on 'Completed' customers.")
-        
-        df_stats = pd.DataFrame(comp_list)
-        avg_wait = df_stats['Wait_Sec'].mean() if len(comp_list) > 0 else 0
-        avg_serv = df_stats['Service_Sec'].mean() if len(comp_list) > 0 else 0
-        avg_sys = df_stats['Total_Sec'].mean() if len(comp_list) > 0 else 0
-
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("Total Arrivals", len(st.session_state.customers))
-        m2.metric("Current Queue", len(wait_list))
-        m3.metric("Max Queue Length", st.session_state.max_q)
-        m4.metric("Completed Services", len(comp_list))
-
-        st.divider()
-        
-        m5, m6, m7 = st.columns(3)
-        m5.metric("Avg Waiting Time", format_time(avg_wait))
-        m6.metric("Avg Service Time", format_time(avg_serv))
-        m7.metric("Avg Time in System", format_time(avg_sys))
+    st.write("---")
+    t1, t2 = st.tabs(["📝 Table", "📊 Dashboard"])
+    with t1:
+        for c in st.session_state.customers:
+            cols = st.columns([1, 1.5, 1, 1, 1, 0.8])
+            cols[0].write(c['Customer ID'])
+            cols[1].write(c['Arrival Time'])
+            cols[2].write(format_time_simple(c['Wait_Sec']))
+            cols[3].write(format_time_simple(c['Service_Sec']))
+            cols[4].write(c['Status'])
+            with cols[5]:
+                st.markdown('<div class="del-btn">', unsafe_allow_html=True)
+                if st.button("Del", key=f"del_{c['Customer ID']}"):
+                    st.session_state.customers = [x for x in st.session_state.customers if x['Customer ID'] != c['Customer ID']]
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+    with t2:
+        render_full_dashboard(st.session_state.customers, st.session_state.active_session, st.session_state.max_q)
