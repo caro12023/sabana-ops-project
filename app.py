@@ -27,25 +27,24 @@ st.markdown("""
     }
     
     /* PÍLDORAS DE ESTADO */
-    .pill-orange { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
-    .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
-    .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
+    .pill-orange { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
+    .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
+    .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* BOTÓN DELETE CENTRADO */
-    .del-btn { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; margin-top: 5px; }
-    .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; font-weight: bold !important; border-radius: 6px !important; padding: 4px 10px !important;}
+    /* BOTÓN DELETE SOBRIO */
+    .del-btn { display: flex; justify-content: center; margin-top: 2px; }
+    .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; font-weight: bold !important; border-radius: 6px !important; padding: 2px 10px !important;}
     .del-btn button:hover { background-color: #fecaca !important; }
     
-    /* TABLA: LETRAS MÁS GRANDES Y DISEÑO LIMPIO */
+    /* TABLA: DISEÑO LIMPIO Y NATURAL */
     .table-head-cell { 
-        text-align: center; font-weight: bold; color: #0f172a; 
-        padding: 12px 4px; font-size: 15px; 
-        border-bottom: 3px solid #94a3b8; margin-bottom: 8px;
+        text-align: center; font-weight: bold; color: #334155; 
+        font-size: 14px; border-bottom: 2px solid #cbd5e1; 
+        padding-bottom: 8px; margin-bottom: 4px;
     }
     .table-data-cell { 
-        text-align: center; padding: 12px 4px; border-bottom: 1px solid #e2e8f0; 
-        color: #1e293b; font-size: 15px; 
-        display: flex; justify-content: center; align-items: center; height: 100%;
+        text-align: center; color: #475569; font-size: 14px; 
+        padding: 6px 0px; border-bottom: 1px solid #f1f5f9;
     }
     
     /* CAJAS VACÍAS ESTÉTICAS */
@@ -163,14 +162,13 @@ def export_pdf(session_info, cust_data):
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- DASHBOARD ORIENTADO AL PROYECTO ---
+# --- DASHBOARD ORIENTADO AL PROYECTO (SIN LAMBDA/MU) ---
 def render_pro_dashboard(cust_data, max_q):
     df = pd.DataFrame(cust_data)
     if df.empty: return st.info("Not enough data to graph yet.")
     
     comp = df[df['Status'] == 'Completed'].copy()
     
-    # --- TÍTULO LIMPIO ---
     st.markdown("### 📊 Performance Metrics")
     
     avg_w_min = comp['Wait_Sec'].mean() / 60 if not comp.empty else 0
@@ -294,7 +292,7 @@ elif st.session_state.active_session is None:
                             st.session_state.selected_history = s
                             st.rerun()
                     with b4:
-                        if st.button("🗑️ Delete", key=f"del_{s['info']['system_start_ts']}", use_container_width=True):
+                        if st.button("Delete", key=f"del_{s['info']['system_start_ts']}", use_container_width=True):
                             st.session_state.history = [h for h in st.session_state.history if h['info']['system_start_ts'] != s['info']['system_start_ts']]
                             st.rerun()
         else:
@@ -381,7 +379,7 @@ else:
     with tab_table:
         if st.session_state.customers:
             
-            col_ratios = [0.9, 1.2, 1.2, 1.2, 1, 1, 1, 1.2, 0.8]
+            col_ratios = [0.8, 1.2, 1.2, 1.2, 1, 1, 1, 1.2, 0.8]
             
             cols_h = st.columns(col_ratios)
             headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Min)", "Service (Min)", "Total (Min)", "Status", "Action"]
@@ -393,9 +391,9 @@ else:
                 s_val = f"{c['Service_Sec']/60:.4f}" if c['Service_Sec'] is not None else "-"
                 t_val = f"{c['Total_Sec']/60:.4f}" if c['Total_Sec'] is not None else "-"
                 
-                if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">⏳ Waiting</span>'
-                elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">⚙️ In Service</span>'
-                else: status_html = '<span class="pill-green">✅ Completed</span>'
+                if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">Waiting</span>'
+                elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">In Service</span>'
+                else: status_html = '<span class="pill-green">Completed</span>'
 
                 cols = st.columns(col_ratios)
                 cols[0].markdown(f"<div class='table-data-cell'><b>{c['Customer ID']}</b></div>", unsafe_allow_html=True)
@@ -409,7 +407,7 @@ else:
                 
                 with cols[8]:
                     st.markdown('<div class="del-btn">', unsafe_allow_html=True)
-                    if st.button("🗑️ Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
+                    if st.button("Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
