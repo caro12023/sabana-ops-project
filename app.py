@@ -20,9 +20,14 @@ st.markdown("""
     }
     .pill-orange { background-color: #fef3c7; color: #b45309; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
     .pill-blue { background-color: #e0f2fe; color: #0369a1; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
-    .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; padding: 4px 12px !important; font-weight: bold !important; }
+    
+    /* Botón de eliminar con caneca */
+    .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; font-weight: bold !important; border-radius: 6px !important; }
     .del-btn button:hover { background-color: #fecaca !important; }
-    .table-header { font-size: 14px; font-weight: bold; color: #0f172a; border-bottom: 2px solid #cbd5e1; padding-bottom: 5px; margin-bottom: 10px; }
+    
+    /* Estilos de la tabla centrada y definida */
+    .table-head-cell { text-align: center; font-weight: bold; background-color: #e2e8f0; color: #0f172a; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 14px;}
+    .table-data-cell { text-align: center; padding: 8px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 14px; display: flex; justify-content: center; align-items: center; height: 100%;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -34,46 +39,43 @@ if 'counter' not in st.session_state: st.session_state.counter = 1
 if 'max_q' not in st.session_state: st.session_state.max_q = 0
 if 'selected_history' not in st.session_state: st.session_state.selected_history = None
 
-# --- FUNCIONES DE FORMATO ---
-def format_time(seconds):
-    if pd.isna(seconds) or seconds is None or seconds < 0: return "-"
-    m, s = divmod(int(seconds), 60)
-    return f"{m}m {s}s"
-
-def format_time_exact(seconds):
-    if pd.isna(seconds) or seconds is None or seconds <= 0: return "0m 0.00s"
-    m, s = divmod(seconds, 60)
-    return f"{int(m)}m {s:.2f}s"
-
-# --- EXCEL ENRIQUECIDO ---
+# --- EXCEL ENRIQUECIDO (NÚMEROS EXACTOS) ---
 def export_excel(cust_data, session_info):
     output = io.BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
     
     if cust_data:
         df = pd.DataFrame(cust_data)
-        df['Wait Time (Formatted)'] = df['Wait_Sec'].apply(format_time)
-        df['Service Time (Formatted)'] = df['Service_Sec'].apply(format_time)
-        df['Total Time (Formatted)'] = df['Total_Sec'].apply(format_time)
+        df['Wait Time (Min)'] = (df['Wait_Sec'] / 60.0).round(2)
+        df['Service Time (Min)'] = (df['Service_Sec'] / 60.0).round(2)
+        df['Total Time (Min)'] = (df['Total_Sec'] / 60.0).round(2)
         
-        # Hoja 1: Datos Puros
-        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Wait Time (Formatted)', 'Service Time (Formatted)', 'Total Time (Formatted)']
+        df['Wait Time (Min)'] = df['Wait Time (Min)'].fillna(0)
+        df['Service Time (Min)'] = df['Service Time (Min)'].fillna(0)
+        df['Total Time (Min)'] = df['Total Time (Min)'].fillna(0)
+        
+        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Wait Time (Min)', 'Service Time (Min)', 'Total Time (Min)']
         df[cols].to_excel(writer, index=False, sheet_name='Observation_Data')
         
-        # Hoja 2: Resumen Analítico
         comp = df[df['Status'] == 'Completed']
         summary_data = {
-            'Metric': ['Total Arrivals', 'Completed Services', 'Average Wait (Sec)', 'Average Service (Sec)', 'Average Total Time (Sec)'],
-            'Value': [len(df), len(comp), comp['Wait_Sec'].mean() if not comp.empty else 0, comp['Service_Sec'].mean() if not comp.empty else 0, comp['Total_Sec'].mean() if not comp.empty else 0]
+            'Metric': ['Total Arrivals', 'Completed Services', 'Average Wait (Min)', 'Average Service (Min)', 'Average Total Time (Min)'],
+            'Value': [
+                len(df), len(comp), 
+                round(comp['Wait_Sec'].mean() / 60, 2) if not comp.empty else 0, 
+                round(comp['Service_Sec'].mean() / 60, 2) if not comp.empty else 0, 
+                round(comp['Total_Sec'].mean() / 60, 2) if not comp.empty else 0
+            ]
         }
         pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Metrics_Summary')
         
-        # Formatos
         workbook = writer.book
-        header_format = workbook.add_format({'bold': True, 'fg_color': '#e2e8f0', 'font_color': '#0f172a', 'border': 1})
+        header_format = workbook.add_format({'bold': True, 'fg_color': '#1e293b', 'font_color': 'white', 'border': 1, 'align': 'center'})
+        data_format = workbook.add_format({'align': 'center'})
+        
         for sheet_name in ['Observation_Data', 'Metrics_Summary']:
             worksheet = writer.sheets[sheet_name]
-            for col_num in range(10): worksheet.set_column(col_num, col_num, 18)
+            for col_num in range(10): worksheet.set_column(col_num, col_num, 18, data_format)
             if sheet_name == 'Observation_Data':
                 for col_num, value in enumerate(cols): worksheet.write(0, col_num, value, header_format)
                 
@@ -90,7 +92,6 @@ def export_pdf(session_info, cust_data):
     start_str = session_info['start_time'].strftime('%I:%M %p')
     end_str = session_info.get('end_time', datetime.now(BOGOTA_TZ)).strftime('%I:%M %p')
     
-    # Resumen Ejecutivo
     pdf.set_font("Arial", size=10)
     pdf.ln(5)
     pdf.cell(100, 6, txt=f"Observer: {session_info['observer']}", ln=0)
@@ -98,11 +99,10 @@ def export_pdf(session_info, cust_data):
     pdf.cell(100, 6, txt=f"Period: {start_str} to {end_str}", ln=0)
     pdf.cell(100, 6, txt=f"Total Customers: {len(cust_data)}", ln=1)
     
-    # Cálculos para el PDF
     df = pd.DataFrame(cust_data)
     comp = df[df['Status'] == 'Completed'] if not df.empty else pd.DataFrame()
-    avg_w = format_time_exact(comp['Wait_Sec'].mean()) if not comp.empty else "0s"
-    avg_s = format_time_exact(comp['Service_Sec'].mean()) if not comp.empty else "0s"
+    avg_w = f"{comp['Wait_Sec'].mean() / 60:.2f} min" if not comp.empty else "0.00 min"
+    avg_s = f"{comp['Service_Sec'].mean() / 60:.2f} min" if not comp.empty else "0.00 min"
     
     pdf.ln(2)
     pdf.set_font("Arial", size=10, style='B')
@@ -110,38 +110,57 @@ def export_pdf(session_info, cust_data):
     
     pdf.ln(5)
     
-    # Tabla
     pdf.set_font("Arial", size=9, style='B')
     pdf.set_fill_color(226, 232, 240)
     pdf.cell(20, 10, 'ID', 1, 0, 'C', True)
     pdf.cell(35, 10, 'Arrival Time', 1, 0, 'C', True)
-    pdf.cell(35, 10, 'Wait Time', 1, 0, 'C', True)
-    pdf.cell(35, 10, 'Service Time', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Wait (Min)', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Service (Min)', 1, 0, 'C', True)
     pdf.cell(35, 10, 'Status', 1, 1, 'C', True)
     
     pdf.set_font("Arial", size=9)
     for c in cust_data:
-        pdf.cell(20, 9, str(c['Customer ID']), 1)
-        pdf.cell(35, 9, str(c['Arrival Time']), 1)
-        pdf.cell(35, 9, format_time(c['Wait_Sec']), 1)
-        pdf.cell(35, 9, format_time(c['Service_Sec']), 1)
-        pdf.cell(35, 9, str(c['Status']).replace('✅ ', ''), 1, 1)
+        w_min = f"{c['Wait_Sec']/60:.2f}" if c['Wait_Sec'] is not None else "-"
+        s_min = f"{c['Service_Sec']/60:.2f}" if c['Service_Sec'] is not None else "-"
+        pdf.cell(20, 9, str(c['Customer ID']), 1, 0, 'C')
+        pdf.cell(35, 9, str(c['Arrival Time']), 1, 0, 'C')
+        pdf.cell(35, 9, w_min, 1, 0, 'C')
+        pdf.cell(35, 9, s_min, 1, 0, 'C')
+        pdf.cell(35, 9, str(c['Status']).replace('✅ ', ''), 1, 1, 'C')
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- GRÁFICAS PRO CON ALTAIR ---
+# --- DASHBOARD CON CÁLCULOS CLAVE ---
 def render_pro_dashboard(cust_data, max_q):
     df = pd.DataFrame(cust_data)
     if df.empty: return st.info("Not enough data to graph yet.")
     
     comp = df[df['Status'] == 'Completed'].copy()
     
-    # Pre-procesamiento de tiempos a Minutos para las gráficas
+    st.markdown("### 📊 System Analytics (High Precision)")
+    
+    avg_w_min = comp['Wait_Sec'].mean() / 60 if not comp.empty else 0
+    avg_s_min = comp['Service_Sec'].mean() / 60 if not comp.empty else 0
+    avg_sys_min = comp['Total_Sec'].mean() / 60 if not comp.empty else 0
+
+    # Quitamos "Current Queue" y dejamos tres métricas clave, bien distribuidas
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Arrivals", len(df))
+    m2.metric("Max Queue Length 👤", max_q)
+    m3.metric("Completed Services", len(comp))
+
+    st.write("---")
+    m5, m6, m7 = st.columns(3)
+    m5.metric("Average Waiting Time", f"{avg_w_min:.2f} min")
+    m6.metric("Average Service Time", f"{avg_s_min:.2f} min")
+    m7.metric("Average Time in System", f"{avg_sys_min:.2f} min")
+
+    st.write("---")
+    st.markdown("### Charts and Visual Analysis")
+    
     if not comp.empty:
         comp['Wait_Min'] = comp['Wait_Sec'] / 60.0
         comp['Service_Min'] = comp['Service_Sec'] / 60.0
-    
-    st.markdown("### Charts and Visual Analysis")
     
     col1, col2 = st.columns(2)
     col3, col4 = st.columns(2)
@@ -160,7 +179,6 @@ def render_pro_dashboard(cust_data, max_q):
 
     with col2:
         st.write("**Queue Length Over Time**")
-        # Calcular el tamaño de la cola en el tiempo
         events = []
         for _, row in df.iterrows():
             events.append({'Time': pd.to_datetime(row['Arrival_ts'], unit='s').tz_localize('UTC').tz_convert(BOGOTA_TZ), 'Change': 1})
@@ -209,7 +227,6 @@ if st.session_state.selected_history:
     render_pro_dashboard(s['data'], s.get('max_q', 0))
 
 elif st.session_state.active_session is None:
-    # --- PANTALLA DE INICIO ---
     st.title("🦅 Sabana Queuing System")
     st.write("Academic operations tracker. Fill the details below to start.")
     st.write("---")
@@ -238,7 +255,7 @@ elif st.session_state.active_session is None:
                     col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
                     col1.download_button("💾 Excel", export_excel(s['data'], s['info']), f"Data_{s['info']['date']}.xlsx", key=f"ex_{s['info']['system_start_ts']}")
                     col2.download_button("📄 PDF", export_pdf(s['info'], s['data']), f"Report_{s['info']['date']}.pdf", key=f"pdf_{s['info']['system_start_ts']}")
-                    if col3.button("📊 Dash", key=f"d_{s['info']['system_start_ts']}"):
+                    if col3.button("📊 Dashboard", key=f"d_{s['info']['system_start_ts']}"):
                         st.session_state.selected_history = s
                         st.rerun()
                     if col4.button("🗑️ Delete", key=f"del_{s['info']['system_start_ts']}"):
@@ -248,7 +265,6 @@ elif st.session_state.active_session is None:
             st.info("No completed sessions yet.")
 
 else:
-    # --- PANTALLA DE MEDICIÓN EN VIVO ---
     h1, h2 = st.columns([4, 1])
     h1.title("Real-Time Queue Registration")
     if h2.button("⏹ END SESSION", type="secondary", use_container_width=True):
@@ -318,34 +334,39 @@ else:
     
     with tab_table:
         if st.session_state.customers:
-            # Encabezados Completos y Bien Distribuidos
             st.markdown("""
-                <div style="display:flex; font-weight:bold; color:#0f172a; border-bottom:2px solid #cbd5e1; padding-bottom:5px; margin-bottom:10px;">
-                    <div style="flex:1">Customer ID</div><div style="flex:1.5">Arrival Time</div>
-                    <div style="flex:1.5">Start Service</div><div style="flex:1.5">End Service</div>
-                    <div style="flex:1">Wait Time</div><div style="flex:1">Service Time</div>
-                    <div style="flex:1.2">Status</div><div style="flex:1">Action</div>
+                <div style="display:flex; margin-bottom: 5px;">
+                    <div style="flex:1;" class="table-head-cell">Customer ID</div>
+                    <div style="flex:1.5; margin-left: 2px;" class="table-head-cell">Arrival Time</div>
+                    <div style="flex:1.5; margin-left: 2px;" class="table-head-cell">Start Service</div>
+                    <div style="flex:1.5; margin-left: 2px;" class="table-head-cell">End Service</div>
+                    <div style="flex:1; margin-left: 2px;" class="table-head-cell">Wait (Min)</div>
+                    <div style="flex:1; margin-left: 2px;" class="table-head-cell">Service (Min)</div>
+                    <div style="flex:1.2; margin-left: 2px;" class="table-head-cell">Status</div>
+                    <div style="flex:1; margin-left: 2px;" class="table-head-cell">Action</div>
                 </div>
             """, unsafe_allow_html=True)
 
             for c in st.session_state.customers:
-                cols = st.columns([1, 1.5, 1.5, 1.5, 1, 1, 1.2, 1])
-                cols[0].write(f"**{c['Customer ID']}**")
-                cols[1].write(c['Arrival Time'])
-                cols[2].write(c['Service Start Time'])
-                cols[3].write(c['Service End Time'])
-                cols[4].write(format_time(c['Wait_Sec']))
-                cols[5].write(format_time(c['Service_Sec']))
+                w_val = f"{c['Wait_Sec']/60:.2f}" if c['Wait_Sec'] is not None else "-"
+                s_val = f"{c['Service_Sec']/60:.2f}" if c['Service_Sec'] is not None else "-"
                 status_icon = "⏳ Waiting" if c['Status'] == 'Waiting' else "⚙️ In Service" if c['Status'] == 'In Service' else "✅ Completed"
-                cols[6].write(status_icon)
+
+                cols = st.columns([1, 1.5, 1.5, 1.5, 1, 1, 1.2, 1])
+                cols[0].markdown(f"<div class='table-data-cell'><b>{c['Customer ID']}</b></div>", unsafe_allow_html=True)
+                cols[1].markdown(f"<div class='table-data-cell'>{c['Arrival Time']}</div>", unsafe_allow_html=True)
+                cols[2].markdown(f"<div class='table-data-cell'>{c['Service Start Time']}</div>", unsafe_allow_html=True)
+                cols[3].markdown(f"<div class='table-data-cell'>{c['Service End Time']}</div>", unsafe_allow_html=True)
+                cols[4].markdown(f"<div class='table-data-cell'>{w_val}</div>", unsafe_allow_html=True)
+                cols[5].markdown(f"<div class='table-data-cell'>{s_val}</div>", unsafe_allow_html=True)
+                cols[6].markdown(f"<div class='table-data-cell'>{status_icon}</div>", unsafe_allow_html=True)
                 
                 with cols[7]:
-                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
-                    if st.button("Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
+                    st.markdown('<div class="table-data-cell del-btn" style="border:none;">', unsafe_allow_html=True)
+                    if st.button("🗑️ Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
                     st.markdown('</div>', unsafe_allow_html=True)
-                st.markdown('<hr style="margin: 2px 0px; border-top: 1px solid #f1f5f9;">', unsafe_allow_html=True)
 
             st.write("")
             col_export1, col_export2 = st.columns([1, 1])
