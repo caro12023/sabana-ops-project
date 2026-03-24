@@ -31,22 +31,6 @@ st.markdown("""
     .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* BOTÓN DELETE MÁS PEQUEÑO Y ALINEADO */
-    .del-btn { display: flex; justify-content: center; margin-top: -6px; }
-    .del-btn button { 
-        background-color: #fee2e2 !important; 
-        color: #991b1b !important; 
-        border: 1px solid #f87171 !important; 
-        font-weight: 600 !important; 
-        border-radius: 4px !important; 
-        padding: 0px 8px !important;
-        font-size: 13px !important;
-        min-height: 26px !important;
-        height: 26px !important;
-        line-height: 1 !important;
-    }
-    .del-btn button:hover { background-color: #fecaca !important; }
-    
     /* TABLA: DISEÑO LIMPIO Y NATURAL */
     .table-head-cell { 
         text-align: center; font-weight: bold; color: #334155; 
@@ -56,6 +40,25 @@ st.markdown("""
     .table-data-cell { 
         text-align: center; color: #475569; font-size: 14px; 
         padding: 6px 0px; border-bottom: 1px solid #f1f5f9;
+    }
+    
+    /* CONVERTIR EL BOTÓN DE DELETE EN UN TEXTO TIPO LINK Y ALINEARLO PERFECTO */
+    div[data-testid="column"]:nth-child(9) button {
+        background-color: transparent !important;
+        border: none !important;
+        color: #ef4444 !important;
+        box-shadow: none !important;
+        text-decoration: underline !important;
+        font-weight: bold !important;
+        margin-top: 10px !important; /* Ajuste fino para centrarlo con la celda de al lado */
+        padding: 0 !important;
+        font-size: 14px !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+    div[data-testid="column"]:nth-child(9) button:hover {
+        color: #b91c1c !important;
+        background-color: transparent !important;
     }
     
     /* CAJAS VACÍAS ESTÉTICAS */
@@ -417,11 +420,10 @@ else:
                 cols[7].markdown(f"<div class='table-data-cell'>{status_html}</div>", unsafe_allow_html=True)
                 
                 with cols[8]:
-                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
+                    # Ya no hay clase del-btn envolviéndolo, el CSS lo intercepta directo
                     if st.button("Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
 
             st.write("")
             col_export1, col_export2 = st.columns([1, 1])
