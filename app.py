@@ -18,18 +18,41 @@ st.markdown("""
     div[data-testid="stVerticalBlock"] > div[style*="border"] { 
         border-radius: 12px; border: 1px solid #cbd5e1; background-color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05); 
     }
-    .pill-orange { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
-    .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
-    .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; }
     
-    /* Botón de eliminar con caneca (Centrado) */
-    .del-btn { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; }
+    /* PESTAÑAS MÁS GRANDES */
+    .stTabs button p {
+        font-size: 18px !important;
+        font-weight: bold !important;
+        color: #1e293b !important;
+    }
+    
+    /* PÍLDORAS DE ESTADO */
+    .pill-orange { background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
+    .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
+    .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: bold; }
+    
+    /* BOTÓN DELETE CENTRADO */
+    .del-btn { display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; margin-top: 5px; }
     .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; font-weight: bold !important; border-radius: 6px !important; padding: 4px 10px !important;}
     .del-btn button:hover { background-color: #fecaca !important; }
     
-    /* Estilos de la tabla 100% alineada */
-    .table-head-cell { text-align: center; font-weight: bold; background-color: #e2e8f0; color: #0f172a; padding: 10px 4px; border-radius: 6px; font-size: 12px; margin-bottom: 8px;}
-    .table-data-cell { text-align: center; padding: 10px 4px; border-bottom: 1px solid #e2e8f0; color: #334155; font-size: 12px; display: flex; justify-content: center; align-items: center; height: 100%;}
+    /* TABLA: LETRAS MÁS GRANDES Y DISEÑO LIMPIO */
+    .table-head-cell { 
+        text-align: center; font-weight: bold; color: #0f172a; 
+        padding: 12px 4px; font-size: 15px; 
+        border-bottom: 3px solid #94a3b8; margin-bottom: 8px;
+    }
+    .table-data-cell { 
+        text-align: center; padding: 12px 4px; border-bottom: 1px solid #e2e8f0; 
+        color: #1e293b; font-size: 15px; 
+        display: flex; justify-content: center; align-items: center; height: 100%;
+    }
+    
+    /* CAJAS VACÍAS ESTÉTICAS */
+    .empty-state-box {
+        min-height: 150px; display: flex; align-items: center; justify-content: center; 
+        color: #64748b; font-size: 15px; font-style: italic;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -49,13 +72,11 @@ def export_excel(cust_data, session_info):
     if cust_data:
         df = pd.DataFrame(cust_data)
         
-        # Blindaje contra KeyError
         for col in ['Wait_Sec', 'Service_Sec', 'Total_Sec']:
             if col not in df.columns: df[col] = 0.0
         for col in ['Service Start Time', 'Service End Time']:
             if col not in df.columns: df[col] = "-"
             
-        # 4 Decimales exactos para cálculos precisos
         df['Wait Time (Min)'] = (pd.to_numeric(df['Wait_Sec'], errors='coerce') / 60.0).round(4).fillna(0)
         df['Service Time (Min)'] = (pd.to_numeric(df['Service_Sec'], errors='coerce') / 60.0).round(4).fillna(0)
         df['Total Time (Min)'] = (pd.to_numeric(df['Total_Sec'], errors='coerce') / 60.0).round(4).fillna(0)
@@ -65,7 +86,6 @@ def export_excel(cust_data, session_info):
         
         comp = df[df['Status'] == 'Completed']
         
-        # Resumen Analítico con 4 decimales
         summary_data = {
             'Metric': ['Total Arrivals', 'Completed Services', 'Average Wait (Min)', 'Average Service (Min)', 'Average Total Time (Min)'],
             'Value': [
@@ -143,14 +163,15 @@ def export_pdf(session_info, cust_data):
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- DASHBOARD ORIENTADO AL PROYECTO (SIN LAMBDA/MU) ---
+# --- DASHBOARD ORIENTADO AL PROYECTO ---
 def render_pro_dashboard(cust_data, max_q):
     df = pd.DataFrame(cust_data)
     if df.empty: return st.info("Not enough data to graph yet.")
     
     comp = df[df['Status'] == 'Completed'].copy()
     
-    st.markdown("### 📊 Performance Metrics (High Precision)")
+    # --- TÍTULO LIMPIO ---
+    st.markdown("### 📊 Performance Metrics")
     
     avg_w_min = comp['Wait_Sec'].mean() / 60 if not comp.empty else 0
     avg_s_min = comp['Service_Sec'].mean() / 60 if not comp.empty else 0
@@ -265,8 +286,7 @@ elif st.session_state.active_session is None:
                 with st.container(border=True):
                     st.write(f"**Date:** {s['info']['date']} | **Obs:** {s['info']['observer']}")
                     
-                    # --- BOTONES DISTANCIADOS Y ORGANIZADOS ---
-                    b1, b2, b3, b4 = st.columns(4)
+                    b1, b2, b3, b4 = st.columns(4, gap="medium")
                     with b1: st.download_button("💾 Excel", export_excel(s['data'], s['info']), f"Data_{s['info']['date']}.xlsx", key=f"ex_{s['info']['system_start_ts']}", use_container_width=True)
                     with b2: st.download_button("📄 PDF", export_pdf(s['info'], s['data']), f"Report_{s['info']['date']}.pdf", key=f"pdf_{s['info']['system_start_ts']}", use_container_width=True)
                     with b3: 
@@ -316,36 +336,44 @@ else:
             cw1, cw2 = st.columns([3, 1])
             cw1.subheader("Waiting Queue")
             cw2.markdown(f'<div class="pill-orange" style="text-align:center;">{len(wait_list)} waiting</div>', unsafe_allow_html=True)
-            for i, c in enumerate(wait_list):
-                with st.container(border=True):
-                    sc1, sc2 = st.columns([3, 1])
-                    sc1.markdown(f"**{c['Customer ID']}** 👤 | Arrived: {c['Arrival Time']}")
-                    sc2.markdown(f'<div class="pill-orange" style="float:right;">Position {i+1}</div>', unsafe_allow_html=True)
-                    if st.button("Start Service", key=f"s_{c['Customer ID']}", type="primary", use_container_width=True):
-                        for item in st.session_state.customers:
-                            if item['Customer ID'] == c['Customer ID']:
-                                item['Status'], item['Start_ts'] = 'In Service', time.time()
-                                item['Service Start Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
-                        st.rerun()
+            
+            if not wait_list:
+                st.markdown('<div class="empty-state-box">No customers currently waiting...</div>', unsafe_allow_html=True)
+            else:
+                for i, c in enumerate(wait_list):
+                    with st.container(border=True):
+                        sc1, sc2 = st.columns([3, 1])
+                        sc1.markdown(f"**{c['Customer ID']}** 👤 | Arrived: {c['Arrival Time']}")
+                        sc2.markdown(f'<div class="pill-orange" style="float:right;">Position {i+1}</div>', unsafe_allow_html=True)
+                        if st.button("Start Service", key=f"s_{c['Customer ID']}", type="primary", use_container_width=True):
+                            for item in st.session_state.customers:
+                                if item['Customer ID'] == c['Customer ID']:
+                                    item['Status'], item['Start_ts'] = 'In Service', time.time()
+                                    item['Service Start Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
+                            st.rerun()
 
     with col_s:
         with st.container(border=True):
             cs1, cs2 = st.columns([3, 1])
             cs1.subheader("Customers In Service")
             cs2.markdown(f'<div class="pill-blue" style="text-align:center;">{len(serv_list)} in service</div>', unsafe_allow_html=True)
-            for c in serv_list:
-                with st.container(border=True):
-                    sc1, sc2 = st.columns([3, 1])
-                    sc1.markdown(f"**{c['Customer ID']}** 🧑‍💻 | Started: {c['Service Start Time']}")
-                    sc2.markdown(f'<div class="pill-blue" style="float:right;">In Service</div>', unsafe_allow_html=True)
-                    if st.button("End Service", key=f"e_{c['Customer ID']}", type="secondary", use_container_width=True):
-                        for item in st.session_state.customers:
-                            if item['Customer ID'] == c['Customer ID']:
-                                item['Status'], item['End_ts'] = 'Completed', time.time()
-                                item['Service End Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
-                                item['Wait_Sec'], item['Service_Sec'] = item['Start_ts'] - item['Arrival_ts'], item['End_ts'] - item['Start_ts']
-                                item['Total_Sec'] = item['End_ts'] - item['Arrival_ts']
-                        st.rerun()
+            
+            if not serv_list:
+                st.markdown('<div class="empty-state-box">No active service at the moment...</div>', unsafe_allow_html=True)
+            else:
+                for c in serv_list:
+                    with st.container(border=True):
+                        sc1, sc2 = st.columns([3, 1])
+                        sc1.markdown(f"**{c['Customer ID']}** 🧑‍💻 | Started: {c['Service Start Time']}")
+                        sc2.markdown(f'<div class="pill-blue" style="float:right;">In Service</div>', unsafe_allow_html=True)
+                        if st.button("End Service", key=f"e_{c['Customer ID']}", type="secondary", use_container_width=True):
+                            for item in st.session_state.customers:
+                                if item['Customer ID'] == c['Customer ID']:
+                                    item['Status'], item['End_ts'] = 'Completed', time.time()
+                                    item['Service End Time'] = datetime.now(BOGOTA_TZ).strftime("%I:%M:%S %p")
+                                    item['Wait_Sec'], item['Service_Sec'] = item['Start_ts'] - item['Arrival_ts'], item['End_ts'] - item['Start_ts']
+                                    item['Total_Sec'] = item['End_ts'] - item['Arrival_ts']
+                            st.rerun()
 
     st.write("---")
     tab_table, tab_dash = st.tabs(["📝 Detailed Data Table", "📊 Live Dashboard & Charts"])
@@ -353,9 +381,10 @@ else:
     with tab_table:
         if st.session_state.customers:
             
-            # --- SE AGREGÓ LA COLUMNA TOTAL TIME (MIN) A LOS ENCABEZADOS ---
-            cols_h = st.columns([0.8, 1.2, 1.2, 1.2, 1, 1, 1, 1.1, 0.8])
-            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait Time (Min)", "Service Time (Min)", "Total Time (Min)", "Status", "Action"]
+            col_ratios = [0.9, 1.2, 1.2, 1.2, 1, 1, 1, 1.2, 0.8]
+            
+            cols_h = st.columns(col_ratios)
+            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Min)", "Service (Min)", "Total (Min)", "Status", "Action"]
             for i, h in enumerate(headers):
                 cols_h[i].markdown(f"<div class='table-head-cell'>{h}</div>", unsafe_allow_html=True)
 
@@ -368,8 +397,7 @@ else:
                 elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">⚙️ In Service</span>'
                 else: status_html = '<span class="pill-green">✅ Completed</span>'
 
-                # --- 9 COLUMNAS PERFECTAMENTE ALINEADAS ---
-                cols = st.columns([0.8, 1.2, 1.2, 1.2, 1, 1, 1, 1.1, 0.8])
+                cols = st.columns(col_ratios)
                 cols[0].markdown(f"<div class='table-data-cell'><b>{c['Customer ID']}</b></div>", unsafe_allow_html=True)
                 cols[1].markdown(f"<div class='table-data-cell'>{c['Arrival Time']}</div>", unsafe_allow_html=True)
                 cols[2].markdown(f"<div class='table-data-cell'>{c['Service Start Time']}</div>", unsafe_allow_html=True)
@@ -380,7 +408,7 @@ else:
                 cols[7].markdown(f"<div class='table-data-cell'>{status_html}</div>", unsafe_allow_html=True)
                 
                 with cols[8]:
-                    st.markdown('<div class="table-data-cell del-btn" style="border:none;">', unsafe_allow_html=True)
+                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
                     if st.button("🗑️ Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
