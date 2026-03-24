@@ -3,3 +3,4 @@ pandas
 xlsxwriter
 fpdf
 pytz
+altair
