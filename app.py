@@ -31,38 +31,30 @@ st.markdown("""
     .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* DESTRUCCIÓN TOTAL DEL FORMATO DE BOTÓN (AHORA ES UN LINK TEXTUAL) */
-    .del-btn { 
-        display: flex; 
-        justify-content: center; 
-        align-items: center; 
-        height: 100%; 
-        padding-top: 6px; /* Ajuste para alinear con el texto adyacente */
-    }
-    .del-btn button {
-        background: transparent !important;
+    /* DESTRUCCIÓN TOTAL DEL FORMATO DE BOTÓN EN LA COLUMNA 9 (ACTION) */
+    div[data-testid="column"]:nth-of-type(9) button {
         background-color: transparent !important;
         border: none !important;
-        box-shadow: none !important;
         color: #ef4444 !important;
+        box-shadow: none !important;
         text-decoration: underline !important;
-        font-weight: 500 !important;
-        padding: 0px !important;
-        margin: 0px !important;
-        min-height: 0px !important;
-        height: auto !important;
-        width: auto !important;
-        line-height: 1 !important;
-    }
-    .del-btn button p {
-        font-size: 13px !important;
-        margin: 0 !important;
+        font-weight: bold !important;
         padding: 0 !important;
-        line-height: 1 !important;
+        margin-top: 8px !important; /* Ajuste milimétrico para alinearlo con el texto */
+        font-size: 14px !important;
+        height: auto !important;
+        min-height: 0 !important;
     }
-    .del-btn button:hover { 
-        color: #991b1b !important; 
-        background-color: transparent !important; 
+    div[data-testid="column"]:nth-of-type(9) button:hover {
+        color: #b91c1c !important;
+        background-color: transparent !important;
+        border: none !important;
+    }
+    div[data-testid="column"]:nth-of-type(9) button:focus, div[data-testid="column"]:nth-of-type(9) button:active {
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
     }
     
     /* TABLA: DISEÑO LIMPIO Y NATURAL */
@@ -106,17 +98,14 @@ def export_excel(cust_data, session_info):
         for col in ['Service Start Time', 'Service End Time']:
             if col not in df.columns: df[col] = "-"
             
-        # Segundos exactos (enteros)
         df['Wait Time (Sec)'] = pd.to_numeric(df['Wait_Sec'], errors='coerce').fillna(0).astype(int)
         df['Service Time (Sec)'] = pd.to_numeric(df['Service_Sec'], errors='coerce').fillna(0).astype(int)
         df['Total Time (Sec)'] = pd.to_numeric(df['Total_Sec'], errors='coerce').fillna(0).astype(int)
         
-        # Minutos calculados a partir de los segundos exactos (4 decimales)
         df['Wait Time (Min)'] = (df['Wait Time (Sec)'] / 60.0).round(4)
         df['Service Time (Min)'] = (df['Service Time (Sec)'] / 60.0).round(4)
         df['Total Time (Min)'] = (df['Total Time (Sec)'] / 60.0).round(4)
         
-        # Organizar columnas en el Excel
         cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Wait Time (Sec)', 'Wait Time (Min)', 'Service Time (Sec)', 'Service Time (Min)', 'Total Time (Sec)', 'Total Time (Min)']
         df[cols].to_excel(writer, index=False, sheet_name='Observation_Data')
         
@@ -146,7 +135,7 @@ def export_excel(cust_data, session_info):
     writer.close()
     return output.getvalue()
 
-# --- PDF ENRIQUECIDO (MINUTOS CON 4 DECIMALES) ---
+# --- PDF ENRIQUECIDO ---
 def export_pdf(session_info, cust_data):
     pdf = FPDF()
     pdf.add_page()
@@ -200,7 +189,7 @@ def export_pdf(session_info, cust_data):
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- DASHBOARD (MINUTOS CON 4 DECIMALES) ---
+# --- DASHBOARD ---
 def render_pro_dashboard(cust_data, max_q):
     df = pd.DataFrame(cust_data)
     if df.empty: return st.info("Not enough data to graph yet.")
@@ -288,7 +277,6 @@ def render_pro_dashboard(cust_data, max_q):
 # RUTEO DE PANTALLAS
 # ==========================================
 
-# --- MODO HISTORIAL (SOLO LECTURA) ---
 if st.session_state.selected_history:
     s = st.session_state.selected_history
     st.markdown(f"## 📂 History Record: {s['info']['date']}")
@@ -334,7 +322,6 @@ if st.session_state.selected_history:
     with tab_hist_dash:
         render_pro_dashboard(s['data'], s.get('max_q', 0))
 
-# --- PANTALLA PRINCIPAL ---
 elif st.session_state.active_session is None:
     st.title("🦅 Sabana Queuing System")
     st.write("Academic operations tracker. Fill the details below to start.")
@@ -346,7 +333,6 @@ elif st.session_state.active_session is None:
         with st.container(border=True):
             obs_name = st.text_input("Observer Name")
             
-            # --- SELECTOR DE FECHA SENCILLO ---
             obs_date = st.date_input("Observation Date", datetime.now(BOGOTA_TZ).date())
             
             if st.button("▶ START MEASURING", type="primary", use_container_width=True):
@@ -382,7 +368,6 @@ elif st.session_state.active_session is None:
         else:
             st.info("No completed sessions yet.")
 
-# --- MODO EN VIVO ---
 else:
     h1, h2 = st.columns([4, 1])
     h1.title("Real-Time Queue Registration")
@@ -494,11 +479,10 @@ else:
                 cols[7].markdown(f"<div class='table-data-cell'>{status_html}</div>", unsafe_allow_html=True)
                 
                 with cols[8]:
-                    st.markdown('<div class="del-btn">', unsafe_allow_html=True)
+                    # Ya NO hay envoltorio "del-btn" en Python, el CSS ataca directamente a la columna
                     if st.button("Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
 
             st.write("")
             col_export1, col_export2 = st.columns([1, 1])
