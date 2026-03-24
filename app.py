@@ -31,9 +31,20 @@ st.markdown("""
     .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* BOTÓN DELETE SOBRIO */
-    .del-btn { display: flex; justify-content: center; margin-top: 2px; }
-    .del-btn button { background-color: #fee2e2 !important; color: #991b1b !important; border: 1px solid #f87171 !important; font-weight: bold !important; border-radius: 6px !important; padding: 2px 10px !important;}
+    /* BOTÓN DELETE MÁS PEQUEÑO Y SUTIL */
+    .del-btn { display: flex; justify-content: center; margin-top: 4px; }
+    .del-btn button { 
+        background-color: #fee2e2 !important; 
+        color: #991b1b !important; 
+        border: 1px solid #f87171 !important; 
+        font-weight: bold !important; 
+        border-radius: 6px !important; 
+        padding: 0px 8px !important;
+        font-size: 12px !important;
+        min-height: 26px !important;
+        height: 26px !important;
+        line-height: 1 !important;
+    }
     .del-btn button:hover { background-color: #fecaca !important; }
     
     /* TABLA: DISEÑO LIMPIO Y NATURAL */
@@ -391,9 +402,10 @@ else:
                 s_val = f"{c['Service_Sec']/60:.4f}" if c['Service_Sec'] is not None else "-"
                 t_val = f"{c['Total_Sec']/60:.4f}" if c['Total_Sec'] is not None else "-"
                 
-                if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">Waiting</span>'
-                elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">In Service</span>'
-                else: status_html = '<span class="pill-green">Completed</span>'
+                # --- AQUÍ ESTÁN LOS EMOTICONOS DE VUELTA ---
+                if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">⏳ Waiting</span>'
+                elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">⚙️ In Service</span>'
+                else: status_html = '<span class="pill-green">✅ Completed</span>'
 
                 cols = st.columns(col_ratios)
                 cols[0].markdown(f"<div class='table-data-cell'><b>{c['Customer ID']}</b></div>", unsafe_allow_html=True)
