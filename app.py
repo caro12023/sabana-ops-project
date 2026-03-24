@@ -6,10 +6,28 @@ import io
 from fpdf import FPDF
 import pytz
 import altair as alt
+import pickle
+import os
 
 # --- ZONA HORARIA Y CONFIGURACIÓN ---
 st.set_page_config(page_title="Sabana Queuing Pro", layout="wide", page_icon="🦅")
 BOGOTA_TZ = pytz.timezone('America/Bogota')
+
+# --- MEMORIA PERSISTENTE (PARA COMPARTIR EL HISTORIAL EN LA NUBE) ---
+HISTORY_FILE = "sabana_history.pkl"
+
+def load_history():
+    if os.path.exists(HISTORY_FILE):
+        try:
+            with open(HISTORY_FILE, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            return []
+    return []
+
+def save_history():
+    with open(HISTORY_FILE, "wb") as f:
+        pickle.dump(st.session_state.history, f)
 
 # --- DISEÑO ESTÉTICO ---
 st.markdown("""
@@ -40,7 +58,7 @@ st.markdown("""
         text-decoration: underline !important;
         font-weight: bold !important;
         padding: 0 !important;
-        margin-top: 8px !important; /* Ajuste milimétrico para alinearlo con el texto */
+        margin-top: 8px !important; 
         font-size: 14px !important;
         height: auto !important;
         min-height: 0 !important;
@@ -78,7 +96,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- MEMORIA DEL SISTEMA ---
-if 'history' not in st.session_state: st.session_state.history = [] 
+if 'history' not in st.session_state: st.session_state.history = load_history()
 if 'active_session' not in st.session_state: st.session_state.active_session = None 
 if 'customers' not in st.session_state: st.session_state.customers = [] 
 if 'counter' not in st.session_state: st.session_state.counter = 1
@@ -277,6 +295,7 @@ def render_pro_dashboard(cust_data, max_q):
 # RUTEO DE PANTALLAS
 # ==========================================
 
+# --- MODO HISTORIAL (SOLO LECTURA) ---
 if st.session_state.selected_history:
     s = st.session_state.selected_history
     st.markdown(f"## 📂 History Record: {s['info']['date']}")
@@ -322,6 +341,7 @@ if st.session_state.selected_history:
     with tab_hist_dash:
         render_pro_dashboard(s['data'], s.get('max_q', 0))
 
+# --- PANTALLA PRINCIPAL ---
 elif st.session_state.active_session is None:
     st.title("🦅 Sabana Queuing System")
     st.write("Academic operations tracker. Fill the details below to start.")
@@ -333,6 +353,7 @@ elif st.session_state.active_session is None:
         with st.container(border=True):
             obs_name = st.text_input("Observer Name")
             
+            # --- SELECTOR DE FECHA SENCILLO ---
             obs_date = st.date_input("Observation Date", datetime.now(BOGOTA_TZ).date())
             
             if st.button("▶ START MEASURING", type="primary", use_container_width=True):
@@ -364,10 +385,12 @@ elif st.session_state.active_session is None:
                     with b4:
                         if st.button("Delete", key=f"del_{s['info']['system_start_ts']}", use_container_width=True):
                             st.session_state.history = [h for h in st.session_state.history if h['info']['system_start_ts'] != s['info']['system_start_ts']]
+                            save_history()
                             st.rerun()
         else:
             st.info("No completed sessions yet.")
 
+# --- MODO EN VIVO ---
 else:
     h1, h2 = st.columns([4, 1])
     h1.title("Real-Time Queue Registration")
@@ -375,6 +398,7 @@ else:
         st.session_state.active_session["end_time"] = datetime.now(BOGOTA_TZ)
         st.session_state.history.append({"info": st.session_state.active_session, "data": list(st.session_state.customers), "max_q": st.session_state.max_q})
         st.session_state.active_session = None
+        save_history() # ¡Guarda en el archivo al terminar!
         st.rerun()
 
     st.write("---")
@@ -479,7 +503,6 @@ else:
                 cols[7].markdown(f"<div class='table-data-cell'>{status_html}</div>", unsafe_allow_html=True)
                 
                 with cols[8]:
-                    # Ya NO hay envoltorio "del-btn" en Python, el CSS ataca directamente a la columna
                     if st.button("Delete", key=f"del_row_{c['Customer ID']}", use_container_width=True):
                         st.session_state.customers = [item for item in st.session_state.customers if item['Customer ID'] != c['Customer ID']]
                         st.rerun()
