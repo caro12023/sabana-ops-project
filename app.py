@@ -31,17 +31,22 @@ st.markdown("""
     .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* BOTÓN DELETE TIPO LINK */
-    .del-btn { display: flex; justify-content: center; align-items: center; height: 100%; margin-top: 4px; }
+    /* BOTÓN DELETE TIPO LINK MÁS PEQUEÑO Y CENTRADO */
+    .del-btn { 
+        display: flex; 
+        justify-content: center; 
+        align-items: center; 
+        margin-top: -14px; 
+    }
     .del-btn button {
         background-color: transparent !important;
         border: none !important;
         color: #ef4444 !important;
         box-shadow: none !important;
         text-decoration: underline !important;
-        font-weight: bold !important;
+        font-weight: normal !important; 
         padding: 0 !important;
-        font-size: 14px !important;
+        font-size: 12px !important; 
         height: auto !important;
         min-height: 0 !important;
     }
@@ -75,7 +80,7 @@ if 'counter' not in st.session_state: st.session_state.counter = 1
 if 'max_q' not in st.session_state: st.session_state.max_q = 0
 if 'selected_history' not in st.session_state: st.session_state.selected_history = None
 
-# --- EXCEL ENRIQUECIDO (TODO EN SEGUNDOS) ---
+# --- EXCEL ENRIQUECIDO (SEGUNDOS Y MINUTOS EXACTOS) ---
 def export_excel(cust_data, session_info):
     output = io.BytesIO()
     writer = pd.ExcelWriter(output, engine='xlsxwriter')
@@ -88,22 +93,29 @@ def export_excel(cust_data, session_info):
         for col in ['Service Start Time', 'Service End Time']:
             if col not in df.columns: df[col] = "-"
             
+        # Segundos exactos (enteros)
         df['Wait Time (Sec)'] = pd.to_numeric(df['Wait_Sec'], errors='coerce').fillna(0).astype(int)
         df['Service Time (Sec)'] = pd.to_numeric(df['Service_Sec'], errors='coerce').fillna(0).astype(int)
         df['Total Time (Sec)'] = pd.to_numeric(df['Total_Sec'], errors='coerce').fillna(0).astype(int)
         
-        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Wait Time (Sec)', 'Service Time (Sec)', 'Total Time (Sec)']
+        # Minutos calculados a partir de los segundos exactos (4 decimales)
+        df['Wait Time (Min)'] = (df['Wait Time (Sec)'] / 60.0).round(4)
+        df['Service Time (Min)'] = (df['Service Time (Sec)'] / 60.0).round(4)
+        df['Total Time (Min)'] = (df['Total Time (Sec)'] / 60.0).round(4)
+        
+        # Organizar columnas en el Excel
+        cols = ['Customer ID', 'Arrival Time', 'Service Start Time', 'Service End Time', 'Status', 'Wait Time (Sec)', 'Wait Time (Min)', 'Service Time (Sec)', 'Service Time (Min)', 'Total Time (Sec)', 'Total Time (Min)']
         df[cols].to_excel(writer, index=False, sheet_name='Observation_Data')
         
         comp = df[df['Status'] == 'Completed']
         
         summary_data = {
-            'Metric': ['Total Arrivals', 'Completed Services', 'Average Wait (Sec)', 'Average Service (Sec)', 'Average Total Time (Sec)'],
+            'Metric': ['Total Arrivals', 'Completed Services', 'Average Wait (Min)', 'Average Service (Min)', 'Average Total Time (Min)'],
             'Value': [
                 len(df), len(comp), 
-                round(comp['Wait_Sec'].mean(), 1) if not comp.empty else 0, 
-                round(comp['Service_Sec'].mean(), 1) if not comp.empty else 0, 
-                round(comp['Total_Sec'].mean(), 1) if not comp.empty else 0
+                round(comp['Wait_Sec'].mean() / 60.0, 4) if not comp.empty else 0, 
+                round(comp['Service_Sec'].mean() / 60.0, 4) if not comp.empty else 0, 
+                round(comp['Total_Sec'].mean() / 60.0, 4) if not comp.empty else 0
             ]
         }
         pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Metrics_Summary')
@@ -114,14 +126,14 @@ def export_excel(cust_data, session_info):
         
         for sheet_name in ['Observation_Data', 'Metrics_Summary']:
             worksheet = writer.sheets[sheet_name]
-            for col_num in range(10): worksheet.set_column(col_num, col_num, 18, data_format)
+            for col_num in range(12): worksheet.set_column(col_num, col_num, 18, data_format)
             if sheet_name == 'Observation_Data':
                 for col_num, value in enumerate(cols): worksheet.write(0, col_num, value, header_format)
                 
     writer.close()
     return output.getvalue()
 
-# --- PDF ENRIQUECIDO ---
+# --- PDF ENRIQUECIDO (MINUTOS CON 4 DECIMALES) ---
 def export_pdf(session_info, cust_data):
     pdf = FPDF()
     pdf.add_page()
@@ -142,10 +154,10 @@ def export_pdf(session_info, cust_data):
     comp = df[df['Status'] == 'Completed'] if not df.empty else pd.DataFrame()
     
     if not df.empty and 'Wait_Sec' in df.columns:
-        avg_w = f"{comp['Wait_Sec'].mean():.1f} s" if not comp.empty else "0.0 s"
-        avg_s = f"{comp['Service_Sec'].mean():.1f} s" if not comp.empty else "0.0 s"
+        avg_w = f"{comp['Wait_Sec'].mean() / 60.0:.4f} min" if not comp.empty else "0.0000 min"
+        avg_s = f"{comp['Service_Sec'].mean() / 60.0:.4f} min" if not comp.empty else "0.0000 min"
     else:
-        avg_w, avg_s = "0.0 s", "0.0 s"
+        avg_w, avg_s = "0.0000 min", "0.0000 min"
         
     pdf.ln(2)
     pdf.set_font("Arial", size=10, style='B')
@@ -156,16 +168,16 @@ def export_pdf(session_info, cust_data):
     pdf.set_fill_color(226, 232, 240)
     pdf.cell(20, 10, 'ID', 1, 0, 'C', True)
     pdf.cell(35, 10, 'Arrival Time', 1, 0, 'C', True)
-    pdf.cell(35, 10, 'Wait (Sec)', 1, 0, 'C', True)
-    pdf.cell(35, 10, 'Service (Sec)', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Wait (Min)', 1, 0, 'C', True)
+    pdf.cell(35, 10, 'Service (Min)', 1, 0, 'C', True)
     pdf.cell(35, 10, 'Status', 1, 1, 'C', True)
     
     pdf.set_font("Arial", size=9)
     for c in cust_data:
         w_sec = c.get('Wait_Sec', None)
         s_sec = c.get('Service_Sec', None)
-        w_val = f"{int(w_sec)} s" if pd.notna(w_sec) else "-"
-        s_val = f"{int(s_sec)} s" if pd.notna(s_sec) else "-"
+        w_val = f"{int(w_sec)/60.0:.4f}" if pd.notna(w_sec) else "-"
+        s_val = f"{int(s_sec)/60.0:.4f}" if pd.notna(s_sec) else "-"
         
         pdf.cell(20, 9, str(c['Customer ID']), 1, 0, 'C')
         pdf.cell(35, 9, str(c['Arrival Time']), 1, 0, 'C')
@@ -175,7 +187,7 @@ def export_pdf(session_info, cust_data):
         
     return pdf.output(dest='S').encode('latin-1')
 
-# --- DASHBOARD (SEGUNDOS EXACTOS) ---
+# --- DASHBOARD (MINUTOS CON 4 DECIMALES) ---
 def render_pro_dashboard(cust_data, max_q):
     df = pd.DataFrame(cust_data)
     if df.empty: return st.info("Not enough data to graph yet.")
@@ -184,9 +196,9 @@ def render_pro_dashboard(cust_data, max_q):
     
     st.markdown("### 📊 Performance Metrics")
     
-    avg_w = comp['Wait_Sec'].mean() if not comp.empty else 0
-    avg_s = comp['Service_Sec'].mean() if not comp.empty else 0
-    avg_sys = comp['Total_Sec'].mean() if not comp.empty else 0
+    avg_w = comp['Wait_Sec'].mean() / 60.0 if not comp.empty else 0
+    avg_s = comp['Service_Sec'].mean() / 60.0 if not comp.empty else 0
+    avg_sys = comp['Total_Sec'].mean() / 60.0 if not comp.empty else 0
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Arrivals", len(df))
@@ -195,12 +207,16 @@ def render_pro_dashboard(cust_data, max_q):
 
     st.write("---")
     m1, m2, m3 = st.columns(3)
-    m1.metric("Average Waiting Time", f"{avg_w:.1f} sec")
-    m2.metric("Average Service Time", f"{avg_s:.1f} sec")
-    m3.metric("Average Time in System", f"{avg_sys:.1f} sec")
+    m1.metric("Average Waiting Time", f"{avg_w:.4f} min")
+    m2.metric("Average Service Time", f"{avg_s:.4f} min")
+    m3.metric("Average Time in System", f"{avg_sys:.4f} min")
 
     st.write("---")
     st.markdown("### Charts and Visual Analysis")
+    
+    if not comp.empty:
+        comp['Wait_Min'] = comp['Wait_Sec'] / 60.0
+        comp['Service_Min'] = comp['Service_Sec'] / 60.0
     
     col1, col2 = st.columns(2)
     col3, col4 = st.columns(2)
@@ -236,21 +252,21 @@ def render_pro_dashboard(cust_data, max_q):
         else: st.info("No queue data yet.")
 
     with col3:
-        st.write("**Waiting Times (Seconds)**")
+        st.write("**Waiting Times (Minutes)**")
         if not comp.empty:
             chart_w = alt.Chart(comp).mark_bar(color="#c27a4d").encode(
                 x=alt.X('Customer ID:N', title='Customer', sort=None),
-                y=alt.Y('Wait_Sec:Q', title='Seconds')
+                y=alt.Y('Wait_Min:Q', title='Minutes')
             ).properties(height=250)
             st.altair_chart(chart_w, use_container_width=True)
         else: st.info("Awaiting completed services.")
 
     with col4:
-        st.write("**Service Times (Seconds)**")
+        st.write("**Service Times (Minutes)**")
         if not comp.empty:
             chart_s = alt.Chart(comp).mark_bar(color="#459c86").encode(
                 x=alt.X('Customer ID:N', title='Customer', sort=None),
-                y=alt.Y('Service_Sec:Q', title='Seconds')
+                y=alt.Y('Service_Min:Q', title='Minutes')
             ).properties(height=250)
             st.altair_chart(chart_s, use_container_width=True)
         else: st.info("Awaiting completed services.")
@@ -277,14 +293,14 @@ if st.session_state.selected_history:
         if s['data']:
             col_ratios_ro = [0.8, 1.3, 1.3, 1.3, 1.1, 1.1, 1.1, 1.2]
             cols_h = st.columns(col_ratios_ro)
-            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Sec)", "Service (Sec)", "Total (Sec)", "Status"]
+            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Min)", "Service (Min)", "Total (Min)", "Status"]
             for i, h in enumerate(headers):
                 cols_h[i].markdown(f"<div class='table-head-cell'>{h}</div>", unsafe_allow_html=True)
 
             for c in s['data']:
-                w_val = f"{int(c['Wait_Sec'])} s" if c['Wait_Sec'] is not None else "-"
-                s_val = f"{int(c['Service_Sec'])} s" if c['Service_Sec'] is not None else "-"
-                t_val = f"{int(c['Total_Sec'])} s" if c['Total_Sec'] is not None else "-"
+                w_val = f"{int(c['Wait_Sec'])/60.0:.4f}" if c['Wait_Sec'] is not None else "-"
+                s_val = f"{int(c['Service_Sec'])/60.0:.4f}" if c['Service_Sec'] is not None else "-"
+                t_val = f"{int(c['Total_Sec'])/60.0:.4f}" if c['Total_Sec'] is not None else "-"
                 
                 if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">⏳ Waiting</span>'
                 elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">⚙️ In Service</span>'
@@ -323,8 +339,8 @@ elif st.session_state.active_session is None:
             if st.button("▶ START MEASURING", type="primary", use_container_width=True):
                 if obs_name:
                     st.session_state.active_session = {
-                        "date": obs_date.strftime("%Y-%m-%d"), # La fecha que escogiste queda guardada
-                        "start_time": datetime.now(BOGOTA_TZ), # La hora real en la que diste clic
+                        "date": obs_date.strftime("%Y-%m-%d"), 
+                        "start_time": datetime.now(BOGOTA_TZ), 
                         "observer": obs_name, 
                         "system_start_ts": int(time.time())
                     }
@@ -441,14 +457,14 @@ else:
             col_ratios = [0.8, 1.2, 1.2, 1.2, 1, 1, 1, 1.2, 0.8]
             
             cols_h = st.columns(col_ratios)
-            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Sec)", "Service (Sec)", "Total (Sec)", "Status", "Action"]
+            headers = ["Customer ID", "Arrival Time", "Start Service", "End Service", "Wait (Min)", "Service (Min)", "Total (Min)", "Status", "Action"]
             for i, h in enumerate(headers):
                 cols_h[i].markdown(f"<div class='table-head-cell'>{h}</div>", unsafe_allow_html=True)
 
             for c in st.session_state.customers:
-                w_val = f"{int(c['Wait_Sec'])} s" if c['Wait_Sec'] is not None else "-"
-                s_val = f"{int(c['Service_Sec'])} s" if c['Service_Sec'] is not None else "-"
-                t_val = f"{int(c['Total_Sec'])} s" if c['Total_Sec'] is not None else "-"
+                w_val = f"{int(c['Wait_Sec'])/60.0:.4f}" if c['Wait_Sec'] is not None else "-"
+                s_val = f"{int(c['Service_Sec'])/60.0:.4f}" if c['Service_Sec'] is not None else "-"
+                t_val = f"{int(c['Total_Sec'])/60.0:.4f}" if c['Total_Sec'] is not None else "-"
                 
                 if c['Status'] == 'Waiting': status_html = '<span class="pill-orange">⏳ Waiting</span>'
                 elif c['Status'] == 'In Service': status_html = '<span class="pill-blue">⚙️ In Service</span>'
