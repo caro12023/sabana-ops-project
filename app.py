@@ -31,26 +31,39 @@ st.markdown("""
     .pill-blue { background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     .pill-green { background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 4px 12px; border-radius: 9999px; font-size: 13px; font-weight: 600; }
     
-    /* BOTÓN DELETE TIPO LINK MÁS PEQUEÑO Y CENTRADO */
+    /* DESTRUCCIÓN TOTAL DEL FORMATO DE BOTÓN (AHORA ES UN LINK TEXTUAL) */
     .del-btn { 
         display: flex; 
         justify-content: center; 
         align-items: center; 
-        margin-top: -14px; 
+        height: 100%; 
+        padding-top: 6px; /* Ajuste para alinear con el texto adyacente */
     }
     .del-btn button {
+        background: transparent !important;
         background-color: transparent !important;
         border: none !important;
-        color: #ef4444 !important;
         box-shadow: none !important;
+        color: #ef4444 !important;
         text-decoration: underline !important;
-        font-weight: normal !important; 
-        padding: 0 !important;
-        font-size: 12px !important; 
+        font-weight: 500 !important;
+        padding: 0px !important;
+        margin: 0px !important;
+        min-height: 0px !important;
         height: auto !important;
-        min-height: 0 !important;
+        width: auto !important;
+        line-height: 1 !important;
     }
-    .del-btn button:hover { color: #b91c1c !important; background-color: transparent !important; }
+    .del-btn button p {
+        font-size: 13px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+    }
+    .del-btn button:hover { 
+        color: #991b1b !important; 
+        background-color: transparent !important; 
+    }
     
     /* TABLA: DISEÑO LIMPIO Y NATURAL */
     .table-head-cell { 
